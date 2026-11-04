@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SendIt</title>
+  <link rel="stylesheet" href="../ui.css">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="bar">
+    <img src="../icons/icon-48.png" alt="" width="24" height="24">
+    <div class="grow">
+      <strong>SendIt</strong>
+      <span id="device-name" class="muted small ellipsis"></span>
+    </div>
+    <button id="open-settings" class="icon-btn" title="Settings" aria-label="Settings"></button>
+  </header>
+
+  <section id="setup" class="setup" hidden>
+    <img src="../icons/icon-128.png" alt="" width="56" height="56">
+    <h2 id="setup-title">Connect to your Via server</h2>
+    <p id="setup-text" class="muted">Send pages, text and files to your other devices, and receive them here.</p>
+    <button id="setup-go" class="btn primary">Set up SendIt</button>
+  </section>
+
+  <main id="app" hidden>
+    <nav class="tabs" role="tablist">
+      <button role="tab" id="tab-btn-send" data-tab="send" aria-selected="true">Send</button>
+      <button role="tab" id="tab-btn-history" data-tab="history" aria-selected="false">History <span id="history-count" class="count"></span></button>
+    </nav>
+
+    <section id="tab-send" role="tabpanel">
+      <div id="send-home" class="options">
+        <button class="option" data-kind="page">
+          <span class="option-icon" data-icon="browser"></span>
+          <span class="grow">
+            <span class="option-title">Send current page</span>
+            <span id="page-hint" class="option-desc ellipsis">The page open in this tab</span>
+          </span>
+        </button>
+        <button class="option" data-kind="link">
+          <span class="option-icon" data-icon="link"></span>
+          <span class="grow">
+            <span class="option-title">Send link</span>
+            <span class="option-desc">Opens in the browser on the other device</span>
+          </span>
+        </button>
+        <button class="option" data-kind="file">
+          <span class="option-icon" data-icon="file"></span>
+          <span class="grow">
+            <span class="option-title">Send file</span>
+            <span class="option-desc">One or more files from this computer</span>
+          </span>
+        </button>
+        <button class="option" data-kind="text">
+          <span class="option-icon" data-icon="text"></span>
+          <span class="grow">
+            <span class="option-title">Send text</span>
+            <span class="option-desc">Arrives on the other device's clipboard</span>
+          </span>
+        </button>
+      </div>
+
+      <form id="composer" class="composer" hidden novalidate>
+        <div class="composer-head">
+          <button type="button" id="back" class="icon-btn" title="Back" aria-label="Back"></button>
+          <h2 id="composer-title"></h2>
+        </div>
+
+        <div id="payload-page" class="payload card" hidden>
+          <strong id="page-title" class="ellipsis"></strong>
+          <span id="page-url" class="muted small ellipsis mono"></span>
+        </div>
+
+        <div id="payload-link" class="fields" hidden>
+          <input type="url" id="link-url" placeholder="https://example.com" aria-label="Link to send" autocomplete="off" spellcheck="false">
+          <input type="text" id="link-title" placeholder="Title (optional)" aria-label="Title" autocomplete="off">
+          <div id="link-error" class="small field-error" hidden>Enter a web address, like example.com</div>
+        </div>
+
+        <div id="payload-text" hidden>
+          <textarea id="text" rows="5" placeholder="Type or paste text" aria-label="Text to send"></textarea>
+          <div class="row text-foot">
+            <span id="link-hint" class="grow small muted" hidden>Looks like a link. <button type="button" id="as-link" class="link-btn">Send as link</button></span>
+            <span id="text-count" class="muted small counter"></span>
+          </div>
+        </div>
+
+        <div id="payload-file" hidden>
+          <label id="drop" class="drop">
+            <input type="file" id="file" multiple>
+            <span data-icon="upload"></span>
+            <span><strong>Choose files</strong> <span class="muted">or drop them here</span></span>
+          </label>
+          <ul id="file-list" class="file-list"></ul>
+        </div>
+
+        <div class="targets">
+          <div class="row targets-head">
+            <span class="grow label">Send to</span>
+            <button type="button" id="select-all" class="link-btn small">Select all</button>
+          </div>
+          <div id="targets" class="target-list"><p class="muted small">Loading devices…</p></div>
+        </div>
+
+        <div id="send-status" class="status" role="status"></div>
+        <button type="submit" id="send" class="btn primary block">Send</button>
+      </form>
+    </section>
+
+    <section id="tab-history" role="tabpanel" hidden>
+      <ul id="history" class="history"></ul>
+      <div id="history-empty" class="empty" hidden>
+        <span data-icon="inbox"></span>
+        <p>Nothing received yet.</p>
+        <p class="muted small">Links, text and files sent to this browser show up here.</p>
+      </div>
+      <div class="history-foot"><button id="clear-history" class="link-btn small">Clear history</button></div>
+    </section>
+  </main>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

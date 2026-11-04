@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SendIt settings</title>
+  <link rel="stylesheet" href="../ui.css">
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main class="page">
+    <header class="brand">
+      <img src="../icons/icon-48.png" alt="" width="36" height="36">
+      <h1>SendIt</h1>
+    </header>
+
+    <!-- onboarding, step 1 -->
+    <form id="step-server" class="card panel stack" hidden novalidate>
+      <div class="stack tight">
+        <span class="step muted small">Step 1 of 2</span>
+        <h2>Connect to your server</h2>
+        <p class="muted">Via is self-hosted. Enter the address you use to open its web UI.</p>
+      </div>
+      <label class="field">Server address
+        <input id="server" type="url" placeholder="https://via.example.com" autocomplete="url" required>
+      </label>
+      <p class="muted small">Your browser will ask to let SendIt talk to this server. That permission covers this address only.</p>
+      <div id="server-status" class="status" role="status"></div>
+      <div class="actions"><button class="btn primary" id="server-go">Continue</button></div>
+    </form>
+
+    <!-- onboarding, step 2 -->
+    <form id="step-account" class="card panel stack" hidden novalidate>
+      <div class="stack tight">
+        <span class="step muted small">Step 2 of 2</span>
+        <h2>Sign in and name this browser</h2>
+        <p class="muted">Connected to <span id="account-server" class="mono"></span>. Your password is only used to register this browser and isn’t stored.</p>
+      </div>
+      <label class="field">Username
+        <input id="username" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" required>
+      </label>
+      <label class="field">Password
+        <input id="password" type="password" autocomplete="current-password" required>
+      </label>
+      <label class="field">Device name
+        <span class="hint muted small">How this browser appears on your other devices. You can change it later.</span>
+        <input id="device-name" type="text" maxlength="64" required>
+      </label>
+      <div id="account-status" class="status" role="status"></div>
+      <div class="actions">
+        <button type="button" class="btn" id="account-back">Back</button>
+        <button class="btn primary" id="account-go">Connect</button>
+      </div>
+    </form>
+
+    <!-- onboarding, done -->
+    <section id="step-done" class="card panel stack" hidden>
+      <div class="done-mark" id="done-mark"></div>
+      <h2>You’re all set</h2>
+      <p class="muted">This browser is now <strong id="done-name"></strong> on your Via account. Links sent to it open in a new tab, text goes to your clipboard and files go to your downloads.</p>
+      <p class="muted">Click the SendIt button in the toolbar to send the current page, a file or some text. Pin it so it’s always in reach.</p>
+      <div class="actions"><button class="btn" id="done-settings">Review settings</button></div>
+    </section>
+
+    <!-- settings -->
+    <div id="settings" class="stack" hidden>
+      <section class="card panel stack">
+        <h2>This browser</h2>
+        <form id="rename" class="stack" novalidate>
+          <label class="field">Device name
+            <div class="row">
+              <input id="rename-name" type="text" maxlength="64" class="grow" required>
+              <button class="btn" id="rename-go">Rename</button>
+            </div>
+          </label>
+          <div id="rename-password" class="stack" hidden>
+            <p class="muted small">This server needs your password to rename devices. It isn’t stored.</p>
+            <label class="field">Password for <span id="rename-user"></span>
+              <input id="rename-pass" type="password" autocomplete="current-password">
+            </label>
+          </div>
+          <div id="rename-status" class="status" role="status"></div>
+        </form>
+        <dl class="facts">
+          <dt>Server</dt><dd id="fact-server" class="mono"></dd>
+          <dt>Account</dt><dd id="fact-user"></dd>
+          <dt>Connection</dt><dd id="fact-conn" class="muted">Checking…</dd>
+        </dl>
+      </section>
+
+      <section class="card panel stack">
+        <h2>When something arrives</h2>
+        <label class="switch"><input type="checkbox" data-setting="autoOpenLinks">
+          <span><strong>Open links automatically</strong><br><span class="muted small">Otherwise a notification lets you open them. Only https links from your own devices open on their own.</span></span>
+        </label>
+        <label class="switch"><input type="checkbox" data-setting="autoCopyText">
+          <span><strong>Copy text to the clipboard</strong><br><span class="muted small">Otherwise click the notification or use the history to copy it.</span></span>
+        </label>
+        <label class="switch"><input type="checkbox" data-setting="askWhereToSave">
+          <span><strong>Ask where to save each file</strong><br><span class="muted small">Otherwise files go straight to your browser’s downloads folder.</span></span>
+        </label>
+        <label class="switch"><input type="checkbox" id="accepts-shares">
+          <span><strong>Receive items from contacts</strong><br><span class="muted small">People you’ve added as contacts on this server can send to this browser.</span></span>
+        </label>
+        <div id="prefs-status" class="status" role="status"></div>
+      </section>
+
+      <section class="card panel stack">
+        <h2>Sign out</h2>
+        <p class="muted">Removing this browser deletes its device from your account; anything still waiting for it is dropped. Your password is needed for that.</p>
+        <form id="remove" class="row wrap" novalidate>
+          <input id="remove-pass" type="password" class="grow" placeholder="Password" autocomplete="current-password" aria-label="Password">
+          <button class="btn danger" id="remove-go">Remove this browser</button>
+        </form>
+        <div id="remove-status" class="status" role="status"></div>
+        <p class="small"><button class="link-btn" id="forget">Sign out without removing it</button> <span class="muted">(you can remove it later from the web UI)</span></p>
+      </section>
+    </div>
+  </main>
+  <script type="module" src="options.js"></script>
+</body>
+</html>

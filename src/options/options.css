@@ -1,0 +1,26 @@
+body { padding: 48px 16px; font-size: 15px; }
+.page { max-width: 520px; margin: 0 auto; display: grid; gap: 20px; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand img { border-radius: 9px; }
+.panel { padding: 24px; }
+.stack.tight { gap: 4px; }
+.step { font-weight: 600; letter-spacing: 0.02em; }
+.actions { display: flex; justify-content: flex-end; gap: 8px; }
+.row.wrap { flex-wrap: wrap; }
+.row input { width: auto; }
+
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 4px 0 0;
+  padding-top: 14px; border-top: 1px solid var(--border); font-size: 0.92em; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
+.facts .ok { color: var(--accent); }
+.facts .bad { color: var(--danger); }
+
+.done-mark { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%;
+  background: var(--accent-soft); color: var(--accent); }
+.done-mark .i { width: 26px; height: 26px; stroke-width: 2.5; }
+
+@media (max-width: 480px) {
+  body { padding: 24px 16px; }
+  .panel { padding: 18px; }
+}

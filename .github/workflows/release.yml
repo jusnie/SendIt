@@ -1,0 +1,157 @@
+# Builds both extensions when a release is published and attaches them to it.
+#
+#   via-chrome-<version>.zip     Chrome / Edge package (Load unpacked, or upload to the Web Store)
+#   via-chromium-<version>.crx   signed package for Chromium browsers that allow off-store
+#                                installs (e.g. Opera, Vivaldi); updates itself
+#   via-chromium-<version>-crx.zip  the same .crx zipped, since Chromium browsers delete .crx
+#                                downloads; the updater still fetches the bare .crx
+#   updates.xml                  Chromium update manifest for the .crx
+#   via-firefox-<version>.xpi    Firefox add-on signed by Mozilla (unlisted), installable directly
+#   updates.json                 Firefox update manifest; installed copies poll it and update
+#                                themselves from the latest release
+#
+# The release tag is the version: v1.2.0 or 1.2.0 (1 to 4 numbers; no -beta suffixes, which
+# browsers reject).
+#
+# To rebuild an existing release (e.g. after changing this workflow), run it by hand with the
+# tag: Actions -> Release -> Run workflow. It builds the tagged code with the current workflow,
+# replaces the assets, and skips what can't be redone: Mozilla signs each version only once,
+# so an existing .xpi and updates.json are kept, and the Web Store upload only runs on release.
+#
+# Secrets (all optional; the matching step is skipped without them):
+#   CRX_PRIVATE_KEY                  PEM signing key for the .crx (`node scripts/crx.mjs keygen`).
+#                                    It fixes the extension ID: never change or lose it.
+#   AMO_JWT_ISSUER, AMO_JWT_SECRET   addons.mozilla.org API key. Without them, the Firefox build
+#                                    is attached as an unsigned zip that only loads temporarily.
+#   CWS_EXTENSION_ID, CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN
+#                                    Chrome Web Store API. With them, the release is also uploaded
+#                                    and published there, which is how Chrome auto-updates.
+
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to rebuild (e.g. v1.0.0)
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.release.tag_name || inputs.tag }}
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+      AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+      AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+      CRX_PRIVATE_KEY: ${{ secrets.CRX_PRIVATE_KEY }}
+      CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+      CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+      CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+      CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Version from the release tag
+        run: |
+          version="${TAG#v}"
+          if ! [[ "$version" =~ ^[0-9]+(\.[0-9]+){0,3}$ ]]; then
+            echo "::error::Tag '$TAG' is not a browser-compatible version (expected e.g. v1.2.0)"
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Check what the release already has
+        run: |
+          assets=$(gh release view "$TAG" --repo "${{ github.repository }}" --json assets --jq '.assets[].name')
+          if grep -qx "via-firefox-$VERSION.xpi" <<< "$assets"; then
+            echo "::notice::via-firefox-$VERSION.xpi is already signed and attached; keeping it"
+            echo "FIREFOX_SIGNED=1" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build
+        env:
+          FIREFOX_UPDATE_URL: https://github.com/${{ github.repository }}/releases/latest/download/updates.json
+          CRX_UPDATE_URL: https://github.com/${{ github.repository }}/releases/latest/download/updates.xml
+        run: node scripts/build.mjs
+
+      - name: Lint the Firefox build
+        run: npx --yes web-ext@8 lint --source-dir dist/firefox --self-hosted
+
+      - name: Package Chrome
+        run: |
+          mkdir -p out
+          (cd dist/chrome && zip -qr "../../out/via-chrome-$VERSION.zip" .)
+
+      - name: Package Chromium (.crx)
+        if: env.CRX_PRIVATE_KEY != ''
+        env:
+          LINK: https://github.com/${{ github.repository }}/releases/download
+        run: |
+          (cd dist/chromium && zip -qr "$RUNNER_TEMP/chromium.zip" .)
+          node scripts/crx.mjs pack "$RUNNER_TEMP/chromium.zip" "out/via-chromium-$VERSION.crx"
+          node scripts/crx.mjs update-xml out/updates.xml "$VERSION" "$LINK/$TAG/via-chromium-$VERSION.crx"
+          (cd out && zip -q "via-chromium-$VERSION-crx.zip" "via-chromium-$VERSION.crx")
+
+      - name: Sign Firefox (unlisted, self-distributed)
+        if: env.AMO_JWT_ISSUER != '' && env.AMO_JWT_SECRET != '' && env.FIREFOX_SIGNED != '1'
+        run: |
+          npx --yes web-ext@8 sign \
+            --source-dir dist/firefox \
+            --channel unlisted \
+            --api-key "$AMO_JWT_ISSUER" \
+            --api-secret "$AMO_JWT_SECRET" \
+            --approval-timeout 900000 \
+            --artifacts-dir signed
+          mv signed/*.xpi "out/via-firefox-$VERSION.xpi"
+
+      - name: Firefox update manifest
+        if: env.AMO_JWT_ISSUER != '' && env.AMO_JWT_SECRET != '' && env.FIREFOX_SIGNED != '1'
+        env:
+          LINK: https://github.com/${{ github.repository }}/releases/download
+        run: |
+          node -e '
+            const fs = require("fs");
+            const m = JSON.parse(fs.readFileSync("dist/firefox/manifest.json", "utf8"));
+            const g = m.browser_specific_settings.gecko;
+            const updates = { addons: { [g.id]: { updates: [{
+              version: m.version,
+              update_link: `${process.env.LINK}/${process.env.TAG}/via-firefox-${m.version}.xpi`,
+              browser_specific_settings: { gecko: { strict_min_version: g.strict_min_version } },
+            }] } } };
+            fs.writeFileSync("out/updates.json", JSON.stringify(updates, null, 2) + "\n");
+          '
+          cat out/updates.json
+
+      - name: Package Firefox unsigned (no AMO key)
+        if: env.AMO_JWT_ISSUER == '' || env.AMO_JWT_SECRET == ''
+        run: |
+          echo "::warning::AMO_JWT_ISSUER/AMO_JWT_SECRET not set: attaching an unsigned Firefox build without auto-update"
+          (cd dist/firefox && zip -qr "../../out/via-firefox-$VERSION-unsigned.zip" .)
+
+      - name: Attach to the release
+        run: gh release upload "$TAG" out/* --clobber --repo "${{ github.repository }}"
+
+      - name: Publish to the Chrome Web Store
+        if: github.event_name == 'release' && env.CWS_EXTENSION_ID != '' && env.CWS_CLIENT_ID != '' && env.CWS_CLIENT_SECRET != '' && env.CWS_REFRESH_TOKEN != ''
+        run: |
+          npx --yes chrome-webstore-upload-cli@3 \
+            --source "out/via-chrome-$VERSION.zip" \
+            --extension-id "$CWS_EXTENSION_ID" \
+            --client-id "$CWS_CLIENT_ID" \
+            --client-secret "$CWS_CLIENT_SECRET" \
+            --refresh-token "$CWS_REFRESH_TOKEN"
