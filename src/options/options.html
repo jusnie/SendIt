@@ -113,6 +113,10 @@
         <label class="switch"><input type="checkbox" data-setting="askWhereToSave">
           <span><strong>Ask where to save each file</strong><br><span class="muted small">Otherwise files go straight to your browser’s downloads folder.</span></span>
         </label>
+        <label class="field">PIN to unlock incoming items
+          <span class="hint muted small">When set, items from other devices stay locked until you enter this PIN in the popup. Leave empty to disable.</span>
+          <input id="pin" type="password" maxlength="12" autocomplete="off" placeholder="Optional PIN">
+        </label>
         <label class="switch"><input type="checkbox" id="accepts-shares">
           <span><strong>Receive items from contacts</strong><br><span class="muted small">People you’ve added as contacts on this server can send to this browser.</span></span>
         </label>

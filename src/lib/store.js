@@ -8,6 +8,7 @@ export const DEFAULT_SETTINGS = {
   askWhereToSave: false,
   autoOpenLinks: true,
   autoCopyText: true,
+  pin: null, // when set, incoming items stay locked until the PIN is entered
 };
 
 const HISTORY_LIMIT = 200;

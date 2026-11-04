@@ -28,7 +28,23 @@ b.runtime.onMessage.addListener((msg) => {
   if (msg?.target !== 'background') return;
   if (msg.type === 'reconnect') reconnect();
   if (msg.type === 'sync') sync();
+  if (msg.type === 'unlock') unlockWithPin(msg.pin, msg.itemId);
 });
+
+/** Release a PIN-locked item when the entered PIN matches. */
+async function unlockWithPin(pin, itemId) {
+  const cfg = await getConfig();
+  if (!cfg.settings.pin || pin !== cfg.settings.pin) {
+    b.notifications.create(`via:pin`, { type: 'basic', iconUrl: 'icons/icon-48.png', title: 'Wrong PIN', message: 'That PIN did not match.' });
+    return;
+  }
+  const history = await getHistory();
+  const entry = history.find((h) => h.id === itemId && h.status === 'locked');
+  if (!entry) return;
+  const item = await client(cfg)(`/v1/inbox/${itemId}`).catch(() => null);
+  if (!item) return;
+  await handle({ ...cfg, settings: { ...cfg.settings, pin: null } }, item);
+}
 b.downloads.onChanged.addListener(onDownloadChanged);
 b.notifications.onClicked.addListener(onNotificationClicked);
 
@@ -247,6 +263,13 @@ async function handle(cfg, item) {
     createdAt: item.created_at,
     receivedAt: new Date().toISOString(),
   };
+
+  // PIN protection: items from other devices/contacts stay locked until unlocked in the popup.
+  if (cfg.settings.pin && item.sender != null) {
+    await putHistory({ ...entry, status: 'locked' });
+    notify(`via:${item.id}`, '🔒 Locked item received', 'Open SendIt and enter your PIN to unlock it.', entry.from);
+    return true;
+  }
 
   if (item.kind === 'link') {
     const openable = isWebUrl(item.url);

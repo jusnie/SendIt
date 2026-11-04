@@ -14,6 +14,7 @@ let cfg;
 let composing = null; // 'page' | 'link' | 'file' | 'text'
 let tab = null;
 let files = [];
+const transfers = []; // send queue: { id, label, kind, progress, status }
 
 for (const el of document.querySelectorAll('[data-icon]')) el.replaceChildren(icon(el.dataset.icon));
 $('open-settings').replaceChildren(icon('settings'));
@@ -66,6 +67,15 @@ async function init() {
   $('as-link').onclick = textToLink;
   setupFileInput();
   $('clear-history').onclick = async () => { await clearHistory(); renderHistory(); };
+  $('pin-unlock').onclick = unlockLocked;
+  $('share-link').onclick = shareCurrent;
+
+  // Drag & drop files anywhere on the popup to send them.
+  document.body.ondragover = (e) => { e.preventDefault(); };
+  document.body.ondrop = (e) => {
+    e.preventDefault();
+    if (e.dataTransfer.files?.length) { addFiles(e.dataTransfer.files); openComposer('file'); }
+  };
 
   loadTargets();
   refreshLimits();
@@ -107,6 +117,8 @@ async function openComposer(kind) {
   }
   $('send-home').hidden = true;
   $('composer').hidden = false;
+  $('share-link').hidden = true;
+  $('qr-box').hidden = true;
   if (kind === 'text') $('text').focus();
   if (kind === 'link') $('link-url').focus();
   if (kind === 'file' && !files.length) $('file').click();
@@ -253,23 +265,38 @@ async function send() {
   const api = client(cfg);
   $('send').disabled = true;
   setStatus(composing === 'file' ? 'Uploading… keep this open until it finishes.' : 'Sending…');
+  const qid = crypto.randomUUID();
   try {
     if (composing === 'page') {
+      addTransfer(qid, `Page: ${tab.title || tab.url}`, 'link');
       await api('/v1/pushes', { method: 'POST', json: { kind: 'link', url: tab.url, title: tab.title || null, to } });
+      finishTransfer(qid, 'sent');
+      $('share-link').hidden = false;
     } else if (composing === 'link') {
       const url = normalizeLink($('link-url').value);
+      addTransfer(qid, url, 'link');
       await api('/v1/pushes', { method: 'POST', json: { kind: 'link', url, title: $('link-title').value.trim() || null, to } });
+      finishTransfer(qid, 'sent');
+      $('share-link').hidden = false;
     } else if (composing === 'text') {
+      addTransfer(qid, 'Text note', 'note');
       await api('/v1/pushes', { method: 'POST', json: { kind: 'note', body: $('text').value, to } });
+      finishTransfer(qid, 'sent');
     } else {
       const items = [...$('file-list').children];
       for (const [i, f] of files.entries()) {
         const bar = items[i].querySelector('.progress');
         bar.hidden = false;
-        await uploadFile(cfg, f, to, (p) => { bar.firstChild.style.width = `${Math.round(p * 100)}%`; });
+        addTransfer(`${qid}:${i}`, f.name, 'file');
+        await uploadFile(cfg, f, to, (p) => {
+          bar.firstChild.style.width = `${Math.round(p * 100)}%`;
+          updateTransfer(`${qid}:${i}`, p, 'uploading');
+        });
+        finishTransfer(`${qid}:${i}`, 'sent');
       }
     }
   } catch (e) {
+    finishTransfer(qid, 'failed');
     setStatus(errorText(e), 'error');
     $('send').disabled = false;
     return;
@@ -425,4 +452,84 @@ function relativeTime(iso) {
     v /= size;
   }
   return new Date(iso).toLocaleDateString();
+}
+
+// --- transfer queue -----------------------------------------------------------------------
+
+function renderQueue() {
+  $('queue-wrap').hidden = !transfers.length;
+  $('queue').replaceChildren(...transfers.slice(-8).map((t) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<div class="row"><span class="grow ellipsis"></span><span class="muted small"></span></div>
+      <div class="progress"><i></i></div>`;
+    li.querySelector('.grow').textContent = t.label;
+    const st = li.querySelector('.row span:last-child');
+    st.textContent = t.status === 'sent' ? '✓ sent' : t.status === 'failed' ? '✗ failed' : `${Math.round((t.progress ?? 0) * 100)}%`;
+    st.style.color = t.status === 'failed' ? 'var(--danger)' : '';
+    const bar = li.querySelector('.progress i');
+    bar.style.width = `${Math.round((t.progress ?? (t.status === 'sent' ? 1 : 0)) * 100)}%`;
+    return li;
+  }));
+}
+
+function addTransfer(id, label, kind) {
+  transfers.unshift({ id, label, kind, progress: 0, status: 'uploading' });
+  renderQueue();
+}
+function updateTransfer(id, progress, status) {
+  const t = transfers.find((x) => x.id === id);
+  if (t) { t.progress = progress; t.status = status; renderQueue(); }
+}
+function finishTransfer(id, status) {
+  for (const t of transfers) if (t.id === id || t.id.startsWith(`${id}:`)) { t.status = status; t.progress = status === 'sent' ? 1 : t.progress; }
+  renderQueue();
+}
+
+// --- share via link / QR ------------------------------------------------------------------
+
+async function shareCurrent() {
+  let url = null;
+  if (composing === 'page') url = tab.url;
+  else if (composing === 'link') url = normalizeLink($('link-url').value);
+  else {
+    // Files/text: ask the server for a share link; fall back to a clear error if unsupported.
+    try {
+      const r = await client(cfg)('/v1/shares', { method: 'POST', json: { kind: composing } });
+      url = r?.url;
+    } catch { /* fall through */ }
+  }
+  if (!url) return setStatus('This server does not support share links for that item.', 'error');
+  await navigator.clipboard.writeText(url);
+  const qr = qrcode(0, 'M');
+  qr.addData(url);
+  qr.make();
+  const canvas = $('qr-canvas');
+  const ctx = canvas.getContext('2d');
+  const n = qr.getModuleCount();
+  const cell = canvas.width / n;
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#1d4ed8';
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) ctx.fillRect(c * cell, r * cell, cell, cell);
+  $('qr-box').hidden = false;
+  setStatus('Link copied — scan the QR or share the URL.', 'ok');
+}
+
+// --- PIN unlock ---------------------------------------------------------------------------
+
+async function renderPinBanner() {
+  const history = await getHistory();
+  const locked = history.filter((h) => h.status === 'locked').length;
+  $('pin-banner').hidden = !locked;
+  if (locked) $('pin-count').textContent = locked;
+}
+
+async function unlockLocked() {
+  const pin = $('pin-input').value;
+  if (!pin) return;
+  const history = await getHistory();
+  for (const h of history.filter((x) => x.status === 'locked')) {
+    b.runtime.sendMessage({ target: 'background', type: 'unlock', pin, itemId: h.id }).catch(() => {});
+  }
+  $('pin-input').value = '';
 }

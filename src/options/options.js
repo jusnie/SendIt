@@ -196,6 +196,7 @@ async function openSettings() {
   $('fact-server').textContent = cfg.server;
   $('fact-user').textContent = cfg.username ?? '';
   for (const el of document.querySelectorAll('[data-setting]')) el.checked = Boolean(cfg.settings[el.dataset.setting]);
+  $('pin').value = cfg.settings.pin ?? '';
   show('settings');
   $('rename-name').blur();
   checkConnection();

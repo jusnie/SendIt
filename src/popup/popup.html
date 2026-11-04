@@ -105,8 +105,17 @@
         </div>
 
         <div id="send-status" class="status" role="status"></div>
-        <button type="submit" id="send" class="btn primary block">Send</button>
+        <div class="row">
+          <button type="submit" id="send" class="btn primary block grow">Send</button>
+          <button type="button" id="share-link" class="btn" title="Copy a shareable link + QR code" hidden>🔗 Share</button>
+        </div>
+        <div id="qr-box" class="qr-box" hidden><canvas id="qr-canvas" width="132" height="132"></canvas></div>
       </form>
+
+      <div id="queue-wrap" hidden>
+        <h3 class="label">Transfers</h3>
+        <ul id="queue" class="queue"></ul>
+      </div>
     </section>
 
     <section id="tab-history" role="tabpanel" hidden>

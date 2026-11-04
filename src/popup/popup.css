@@ -101,3 +101,16 @@ body.standalone { width: auto; min-height: 100vh; }
 .setup .btn { margin-top: 8px; }
 
 .sent-check { display: inline-flex; vertical-align: -4px; }
+
+/* transfer queue */
+.queue { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.queue .progress { height: 4px; border-radius: 2px; background: var(--line, #e2e8f0); overflow: hidden; }
+.queue .progress i { display: block; height: 100%; background: var(--accent, #1d4ed8); width: 0; transition: width .15s; }
+
+/* share QR */
+.qr-box { display: flex; justify-content: center; padding: 10px 0 2px; }
+.qr-box canvas { border-radius: 8px; border: 1px solid var(--line, #e2e8f0); }
+
+/* PIN banner */
+.pin-banner { margin: 8px 12px 0; padding: 8px 10px; border-radius: 8px; background: #fef3c7; color: #92400e; font-size: 12px; display: grid; gap: 6px; }
+.pin-banner input { min-width: 0; }
