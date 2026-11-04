@@ -4,6 +4,8 @@ import { icon } from '../lib/icons.js';
 import { appendLinkified, isLinkInput, looksLikeLink, normalizeLink, singleLink } from '../lib/links.js';
 import { clearHistory, getConfig, getHistory, putHistory, updateConfig } from '../lib/store.js';
 
+import { probeLan } from '../lib/lan.js';
+
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 const standalone = params.has('view'); // opened in its own window (Firefox file picker)
@@ -20,6 +22,20 @@ if (standalone) document.body.classList.add('standalone');
 
 init();
 
+// Silently look for a Via server on the LAN as soon as the popup opens.
+// If found, remember it so setup is one click; otherwise leave the button as-is.
+async function autoDetectLan() {
+  $('setup-text').textContent = 'Looking for a server on your network…';
+  const found = await probeLan();
+  if (found) {
+    await updateConfig({ server: found });
+    $('setup-title').textContent = 'Found a server on your network';
+    $('setup-text').textContent = `${found} — continue to sign in and start sending.`;
+  } else {
+    $('setup-text').textContent = 'Send pages, text and files to your other devices, and receive them here.';
+  }
+}
+
 async function init() {
   cfg = await getConfig();
   $('open-settings').onclick = () => { b.runtime.openOptionsPage(); window.close(); };
@@ -29,6 +45,8 @@ async function init() {
       $('setup-title').textContent = 'Signed out';
       $('setup-text').textContent = 'This browser is no longer connected to your Via account. Sign in again to keep sending and receiving.';
       $('setup-go').textContent = 'Sign in again';
+    } else {
+      autoDetectLan();
     }
     $('setup-go').onclick = () => { b.runtime.openOptionsPage(); window.close(); };
     return;

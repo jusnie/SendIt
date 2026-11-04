@@ -1,4 +1,5 @@
 import { ApiError, call, client, errorText, normalizeServer, originPattern, withSession } from '../lib/api.js';
+import { LAN_PERMISSIONS, probeLan } from '../lib/lan.js';
 import { b } from '../lib/browser.js';
 import { icon } from '../lib/icons.js';
 import { getConfig, updateConfig, updateSettings } from '../lib/store.js';
@@ -80,28 +81,14 @@ async function detectLan() {
   btn.disabled = true;
   status('server-status', 'Looking for a server on your network…');
   try {
-    const granted = await b.permissions.request({
-      origins: ['http://192.168.*/*', 'http://10.*/*', 'http://172.16.*/*', 'http://via.local/*', 'http://sendit.local/*'],
-    });
+    const granted = await b.permissions.request({ origins: LAN_PERMISSIONS });
     if (!granted) return status('server-status', 'Permission for local network addresses was denied.', 'error');
-    const hosts = ['via.local', 'sendit.local', '192.168.1.1', '192.168.0.1', '10.0.0.1', '172.16.0.1'];
-    const ports = ['', ':8080', ':3000', ':8787', ':80'];
-    for (const host of hosts) {
-      for (const port of ports) {
-        const server = `http://${host}${port}`;
-        try {
-          const ctrl = new AbortController();
-          const timer = setTimeout(() => ctrl.abort(), 1200);
-          const info = await call(server, '/v1/info', { signal: ctrl.signal });
-          clearTimeout(timer);
-          if (info?.name === 'via') {
-            $('type-lan').checked = true;
-            $('type-lan').onchange?.();
-            $('server').value = server;
-            return status('server-status', `Found a Via server at ${server}`, 'ok');
-          }
-        } catch { /* keep probing */ }
-      }
+    const found = await probeLan();
+    if (found) {
+      $('type-lan').checked = true;
+      $('type-lan').onchange?.();
+      $('server').value = found;
+      return status('server-status', `Found a Via server at ${found}`, 'ok');
     }
     status('server-status', 'No Via server found on your network. Enter its address manually.', 'error');
   } catch (err) {
