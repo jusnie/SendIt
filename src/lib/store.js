@@ -9,6 +9,7 @@ export const DEFAULT_SETTINGS = {
   autoOpenLinks: true,
   autoCopyText: true,
   pin: null, // when set, incoming items stay locked until the PIN is entered
+  preferDirect: false, // try WebRTC direct transfer before uploading via the server
 };
 
 const HISTORY_LIMIT = 200;

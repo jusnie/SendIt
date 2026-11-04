@@ -53,6 +53,13 @@
             <span class="option-desc">One or more files from this computer</span>
           </span>
         </button>
+        <button class="option" data-kind="folder">
+          <span class="option-icon" data-icon="folder"></span>
+          <span class="grow">
+            <span class="option-title">Send folder</span>
+            <span class="option-desc">A whole folder, sent as one zip</span>
+          </span>
+        </button>
         <button class="option" data-kind="text">
           <span class="option-icon" data-icon="text"></span>
           <span class="grow">
@@ -90,6 +97,7 @@
         <div id="payload-file" hidden>
           <label id="drop" class="drop">
             <input type="file" id="file" multiple>
+            <input type="file" id="folder" webkitdirectory hidden>
             <span data-icon="upload"></span>
             <span><strong>Choose files</strong> <span class="muted">or drop them here</span></span>
           </label>

@@ -113,6 +113,9 @@
         <label class="switch"><input type="checkbox" data-setting="askWhereToSave">
           <span><strong>Ask where to save each file</strong><br><span class="muted small">Otherwise files go straight to your browser’s downloads folder.</span></span>
         </label>
+        <label class="switch"><input type="checkbox" data-setting="preferDirect">
+          <span><strong>Prefer direct (WebRTC) file transfers</strong><br><span class="muted small">Send files peer-to-peer when possible; falls back to the server automatically.</span></span>
+        </label>
         <label class="field">PIN to unlock incoming items
           <span class="hint muted small">When set, items from other devices stay locked until you enter this PIN in the popup. Leave empty to disable.</span>
           <input id="pin" type="password" maxlength="12" autocomplete="off" placeholder="Optional PIN">

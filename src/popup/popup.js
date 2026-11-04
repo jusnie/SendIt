@@ -5,6 +5,8 @@ import { appendLinkified, isLinkInput, looksLikeLink, normalizeLink, singleLink 
 import { clearHistory, getConfig, getHistory, putHistory, updateConfig } from '../lib/store.js';
 
 import { probeLan } from '../lib/lan.js';
+import { qrcode } from '../lib/qr.js';
+import { zipSync, strToU8 } from '../lib/fflate.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -151,6 +153,18 @@ function textToLink() {
 function setupFileInput() {
   const drop = $('drop');
   $('file').onchange = () => { addFiles($('file').files); $('file').value = ''; };
+  $('folder').onchange = async () => {
+    const list = [...$('folder').files];
+    $('folder').value = '';
+    if (!list.length) return;
+    const root = (list[0].webkitRelativePath?.split('/')[0]) || 'folder';
+    const data = {};
+    for (const f of list) {
+      data[f.webkitRelativePath] = new Uint8Array(await f.arrayBuffer());
+    }
+    const zipped = zipSync(data);
+    addFiles([new File([zipped], `${root}.zip`, { type: 'application/zip' })]);
+  };
   drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); };
   drop.ondragleave = () => drop.classList.remove('over');
   drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); addFiles(e.dataTransfer.files); };
@@ -288,10 +302,18 @@ async function send() {
         const bar = items[i].querySelector('.progress');
         bar.hidden = false;
         addTransfer(`${qid}:${i}`, f.name, 'file');
-        await uploadFile(cfg, f, to, (p) => {
-          bar.firstChild.style.width = `${Math.round(p * 100)}%`;
-          updateTransfer(`${qid}:${i}`, p, 'uploading');
-        });
+        // Prefer a direct WebRTC transfer when enabled; always fall back to server upload.
+        let direct = false;
+        if (cfg.settings?.preferDirect) {
+          updateTransfer(`${qid}:${i}`, 0.05, 'direct…');
+          direct = await sendFileDirect(cfg, f, to);
+        }
+        if (!direct) {
+          await uploadFile(cfg, f, to, (p) => {
+            bar.firstChild.style.width = `${Math.round(p * 100)}%`;
+            updateTransfer(`${qid}:${i}`, p, 'uploading');
+          });
+        }
         finishTransfer(`${qid}:${i}`, 'sent');
       }
     }
@@ -401,19 +423,31 @@ function historyEntry(h) {
   if (h.kind === 'link' && /^https?:/i.test(h.url ?? '')) {
     action('copy', 'Copy link', (e) => copy(e.currentTarget, h.url));
     action('open', 'Open', () => openFromHistory(h, h.url));
+    action('send', 'Send again', () => resend({ kind: 'link', url: h.url, title: h.title || null }));
   } else if (h.kind === 'note') {
     action('copy', 'Copy text', (e) => copy(e.currentTarget, h.body ?? h.title ?? ''));
     const link = singleLink(h.body ?? h.title);
     if (link) action('open', 'Open link', () => openFromHistory(h, link));
+    action('send', 'Send again', () => resend({ kind: 'note', body: h.body ?? h.title ?? '' }));
   } else if (h.kind === 'file' && h.status === 'downloaded' && h.downloadId != null) {
     action('folder', 'Show in folder', () => b.downloads.show(h.downloadId));
-  } else if (h.kind === 'file' && h.status === 'failed') {
-    action('retry', 'Retry download', async () => {
+  } else if (h.kind === 'file') {
+    if (h.status === 'downloaded' && h.downloadId != null) action('folder', 'Show in folder', () => b.downloads.show(h.downloadId));
+    action('retry', h.status === 'failed' ? 'Retry download' : 'Re-download', async () => {
       await putHistory({ id: h.id, status: 'downloading', attempts: 0 });
-      b.runtime.sendMessage({ target: 'background', type: 'sync' }).catch(() => {});
+      b.runtime.sendMessage({ target: 'background', type: 'redownload', itemId: h.id }).catch(() => {});
     });
   }
   return li;
+}
+
+/** Re-send a received link/note to the last used targets. */
+async function resend(payload) {
+  const to = cfg.lastTargets?.length ? cfg.lastTargets : [];
+  if (!to.length) return;
+  try {
+    await client(cfg)('/v1/pushes', { method: 'POST', json: { ...payload, to } });
+  } catch { /* offline */ }
 }
 
 async function openFromHistory(h, url) {

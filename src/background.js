@@ -29,7 +29,23 @@ b.runtime.onMessage.addListener((msg) => {
   if (msg.type === 'reconnect') reconnect();
   if (msg.type === 'sync') sync();
   if (msg.type === 'unlock') unlockWithPin(msg.pin, msg.itemId);
+  if (msg.type === 'redownload') redownload(msg.itemId);
 });
+
+/** Re-download a file item from the server (history "Re-download" button). */
+async function redownload(itemId) {
+  const cfg = await getConfig();
+  const item = await client(cfg)(`/v1/inbox/${itemId}`).catch(() => null);
+  if (!item) return;
+  const entry = {
+    id: item.id, kind: item.kind, title: item.title, body: item.body, url: item.url,
+    file: item.file ? { name: item.file.name, size: item.file.size, mime: item.file.mime } : null,
+    sender: item.sender, from: item.sender ? `@${item.sender}` : await deviceName(cfg, item.source_device_id),
+    createdAt: item.created_at, receivedAt: new Date().toISOString(),
+  };
+  await handle({ ...cfg, settings: { ...cfg.settings, pin: null } }, item);
+  void entry;
+}
 
 /** Release a PIN-locked item when the entered PIN matches. */
 async function unlockWithPin(pin, itemId) {
@@ -173,6 +189,26 @@ async function onEvent({ type, data }) {
   if (type === 'ready' || type === 'push') sync();
   else if (type === 'recalled') await dropRecalled(data.id);
   else if (type === 'revoked') await signedOutRemotely();
+  else if (type === 'rtc-offer') onRtcOffer(data);
+}
+
+/** Incoming WebRTC direct-transfer offer: answer it and save the file. */
+async function onRtcOffer(data) {
+  const cfg = await getConfig();
+  if (!cfg.token || !data?.sdp) return;
+  const { answerOffer } = await import('./lib/p2p.js');
+  await answerOffer(cfg, data, async (file) => {
+    try {
+      const downloadId = await b.downloads.download({
+        url: URL.createObjectURL(file),
+        filename: sanitizeFilename(file.name),
+        saveAs: cfg.settings.askWhereToSave,
+        conflictAction: 'uniquify',
+      });
+      notify(`via:rtc-${Date.now()}`, file.name, 'Received directly over the local network.', data.from);
+      void downloadId;
+    } catch { /* user cancelled save dialog */ }
+  });
 }
 
 async function signedOutRemotely() {
@@ -277,7 +313,8 @@ async function handle(cfg, item) {
     const auto = openable && trusted && cfg.settings.autoOpenLinks && item.url.startsWith('https:');
     if (auto) await b.tabs.create({ url: item.url });
     await putHistory({ ...entry, status: auto ? 'opened' : 'received' });
-    notify(`via:${item.id}`, item.title || hostOf(item.url), auto ? `Opened ${item.url}` : `${item.url}\nClick to open.`, entry.from);
+    notify(`via:${item.id}`, item.title || hostOf(item.url), auto ? `Opened ${item.url}` : `${item.url}\nClick to open.`, entry.from,
+      openable && !auto ? [{ title: 'Open' }] : undefined);
     return true;
   }
 
@@ -286,7 +323,8 @@ async function handle(cfg, item) {
     const auto = trusted && cfg.settings.autoCopyText;
     if (auto) await copyText(text);
     await putHistory({ ...entry, status: auto ? 'copied' : 'received' });
-    notify(`via:${item.id}`, item.title || (auto ? 'Text copied to clipboard' : 'New text'), auto ? text : `${text}\nClick to copy.`, entry.from);
+    notify(`via:${item.id}`, item.title || (auto ? 'Text copied to clipboard' : 'New text'), auto ? text : `${text}\nClick to copy.`, entry.from,
+      !auto ? [{ title: 'Copy' }] : undefined);
     return true;
   }
 
@@ -360,7 +398,7 @@ async function finishFile(itemId, status, downloadId = null, path = null) {
   if (cfg.token) await call(cfg.server, `/v1/inbox/${itemId}/ack`, { method: 'POST', token: cfg.token }).catch(() => {});
   if (status === 'downloaded') {
     const entry = (await getHistory()).find((h) => h.id === itemId);
-    notify(`via:${itemId}`, entry?.file?.name ?? 'File received', 'Saved to your downloads. Click to show it.', entry?.from);
+    notify(`via:${itemId}`, entry?.file?.name ?? 'File received', 'Saved to your downloads.', entry?.from, [{ title: 'Show' }]);
   }
 }
 
@@ -443,14 +481,31 @@ async function copyText(text) {
 
 // --- notifications ------------------------------------------------------------------------
 
-function notify(id, title, message, from) {
+function notify(id, title, message, from, buttons) {
   b.notifications.create(id, {
     type: 'basic',
     iconUrl: b.runtime.getURL('icons/icon-128.png'),
     title: from ? `${title} · from ${from}` : title,
     message: String(message).slice(0, 300),
+    ...(buttons?.length ? { buttons } : {}),
   });
 }
+
+b.notifications.onButtonClicked.addListener(async (id, index) => {
+  b.notifications.clear(id);
+  const itemId = id.replace(/^via:/, '');
+  const entry = (await getHistory()).find((h) => h.id === itemId);
+  if (!entry) return;
+  if (entry.kind === 'link' && isWebUrl(entry.url)) {
+    await b.tabs.create({ url: entry.url });
+    if (entry.status === 'received') await putHistory({ id: itemId, status: 'opened' });
+  } else if (entry.kind === 'note') {
+    await copyText(entry.body ?? entry.title ?? '');
+    if (entry.status === 'received') await putHistory({ id: itemId, status: 'copied' });
+  } else if (entry.kind === 'file' && entry.downloadId != null) {
+    await b.downloads.show(entry.downloadId);
+  }
+});
 
 async function onNotificationClicked(id) {
   b.notifications.clear(id);
