@@ -55,13 +55,17 @@ function startOnboarding() {
   const saved = cfg.server ?? '';
   const isVia = saved === '' || saved === VIA_SERVER;
   $('type-via').checked = isVia;
-  $('type-custom').checked = !isVia;
+  $('type-custom').checked = !isVia && saved.startsWith('https://');
+  $('type-lan').checked = !isVia && !saved.startsWith('https://');
   $('server').value = isVia ? VIA_SERVER : saved;
   $('server').readOnly = isVia;
+  $('server').placeholder = $('type-lan').checked ? 'http://192.168.1.10:8080' : 'https://via.example.com';
   for (const el of document.querySelectorAll('input[name="server-type"]')) {
     el.onchange = () => {
       const via = $('type-via').checked;
+      const lan = $('type-lan').checked;
       $('server').readOnly = via;
+      $('server').placeholder = lan ? 'http://192.168.1.10:8080' : 'https://via.example.com';
       $('server').value = via ? VIA_SERVER : (cfg.server && cfg.server !== VIA_SERVER ? cfg.server : '');
     };
   }
