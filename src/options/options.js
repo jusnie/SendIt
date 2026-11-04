@@ -6,6 +6,9 @@ import { getConfig, updateConfig, updateSettings } from '../lib/store.js';
 const $ = (id) => document.getElementById(id);
 const VIEWS = ['step-server', 'step-account', 'step-done', 'settings'];
 
+// Address of the managed Via server offered as the default choice.
+const VIA_SERVER = 'https://via.sendit.app';
+
 let cfg;
 let pending = null; // onboarding: { server, info }
 
@@ -49,7 +52,19 @@ function busy(button, on) {
 // --- onboarding ---------------------------------------------------------------------------
 
 function startOnboarding() {
-  $('server').value = cfg.server ?? '';
+  const saved = cfg.server ?? '';
+  const isVia = saved === '' || saved === VIA_SERVER;
+  $('type-via').checked = isVia;
+  $('type-custom').checked = !isVia;
+  $('server').value = isVia ? VIA_SERVER : saved;
+  $('server').readOnly = isVia;
+  for (const el of document.querySelectorAll('input[name="server-type"]')) {
+    el.onchange = () => {
+      const via = $('type-via').checked;
+      $('server').readOnly = via;
+      $('server').value = via ? VIA_SERVER : (cfg.server && cfg.server !== VIA_SERVER ? cfg.server : '');
+    };
+  }
   status('server-status', cfg.server ? 'This browser was signed out. Sign in again to reconnect.' : '');
   show('step-server');
 }

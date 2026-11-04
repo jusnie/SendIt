@@ -18,8 +18,16 @@
     <form id="step-server" class="card panel stack" hidden novalidate>
       <div class="stack tight">
         <span class="step muted small">Step 1 of 2</span>
-        <h2>Connect to your server</h2>
-        <p class="muted">Via is self-hosted. Enter the address you use to open its web UI.</p>
+        <h2>Connect to a server</h2>
+        <p class="muted">Use the Via server, or your own self-hosted one.</p>
+      </div>
+      <div class="row wrap" role="radiogroup" aria-label="Server type">
+        <label class="switch"><input type="radio" name="server-type" id="type-via" value="via" checked>
+          <span><strong>Via server</strong><br><span class="muted small">The managed Via service.</span></span>
+        </label>
+        <label class="switch"><input type="radio" name="server-type" id="type-custom" value="custom">
+          <span><strong>Custom server</strong><br><span class="muted small">Your own self-hosted Via server.</span></span>
+        </label>
       </div>
       <label class="field">Server address
         <input id="server" type="url" placeholder="https://via.example.com" autocomplete="url" required>
