@@ -17,6 +17,7 @@ init();
 async function init() {
   cfg = await getConfig();
   $('step-server').onsubmit = onServer;
+  $('detect').onclick = detectLan;
   $('step-account').onsubmit = onAccount;
   $('account-back').onclick = () => show('step-server');
   $('done-settings').onclick = openSettings;
@@ -71,6 +72,43 @@ function startOnboarding() {
   }
   status('server-status', cfg.server ? 'This browser was signed out. Sign in again to reconnect.' : '');
   show('step-server');
+}
+
+// Probe common LAN locations for a Via server and fill in the first one that answers.
+async function detectLan() {
+  const btn = $('detect');
+  btn.disabled = true;
+  status('server-status', 'Looking for a server on your network…');
+  try {
+    const granted = await b.permissions.request({
+      origins: ['http://192.168.*/*', 'http://10.*/*', 'http://172.16.*/*', 'http://via.local/*', 'http://sendit.local/*'],
+    });
+    if (!granted) return status('server-status', 'Permission for local network addresses was denied.', 'error');
+    const hosts = ['via.local', 'sendit.local', '192.168.1.1', '192.168.0.1', '10.0.0.1', '172.16.0.1'];
+    const ports = ['', ':8080', ':3000', ':8787', ':80'];
+    for (const host of hosts) {
+      for (const port of ports) {
+        const server = `http://${host}${port}`;
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 1200);
+          const info = await call(server, '/v1/info', { signal: ctrl.signal });
+          clearTimeout(timer);
+          if (info?.name === 'via') {
+            $('type-lan').checked = true;
+            $('type-lan').onchange?.();
+            $('server').value = server;
+            return status('server-status', `Found a Via server at ${server}`, 'ok');
+          }
+        } catch { /* keep probing */ }
+      }
+    }
+    status('server-status', 'No Via server found on your network. Enter its address manually.', 'error');
+  } catch (err) {
+    status('server-status', errorText(err), 'error');
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function onServer(e) {
