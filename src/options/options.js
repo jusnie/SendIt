@@ -83,9 +83,13 @@ function startOnboarding() {
 async function detectLan(auto = false) {
   if (!auto) status('server-status', 'Looking for a server on your network…');
   try {
-    if (!auto) {
+    // Ensure LAN host permission before probing; a click on the LAN option is a
+    // user gesture, so the request can be shown. Without it Brave blocks the fetches.
+    const has = await b.permissions.contains({ origins: LAN_PERMISSIONS });
+    if (!has) {
       const granted = await b.permissions.request({ origins: LAN_PERMISSIONS });
-      if (!granted) return status('server-status', 'Permission for local network addresses was denied.', 'error');
+      if (!granted && !auto) return status('server-status', 'Permission for local network addresses was denied.', 'error');
+      if (!granted) return; // silent in auto mode; field stays editable
     }
     const found = await probeLan();
     if (found) {

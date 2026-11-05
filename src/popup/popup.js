@@ -29,6 +29,12 @@ init();
 // If found, remember it so setup is one click; otherwise leave the button as-is.
 async function autoDetectLan() {
   $('setup-text').textContent = 'Looking for a server on your network…';
+  // Popup open is a user gesture: ask for LAN access so the probe can actually fetch.
+  try {
+    const { LAN_PERMISSIONS } = await import('../lib/lan.js');
+    const has = await b.permissions.contains({ origins: LAN_PERMISSIONS });
+    if (!has) await b.permissions.request({ origins: LAN_PERMISSIONS });
+  } catch { /* probe will just find nothing */ }
   const found = await probeLan();
   if (found) {
     await updateConfig({ server: found });
