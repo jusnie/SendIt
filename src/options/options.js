@@ -7,8 +7,9 @@ import { getConfig, updateConfig, updateSettings } from '../lib/store.js';
 const $ = (id) => document.getElementById(id);
 const VIEWS = ['step-server', 'step-account', 'step-done', 'settings'];
 
-// Address of the managed Via server offered as the default choice.
-const VIA_SERVER = 'https://via.sendit.app';
+// Default Via server address offered as the "Via server" choice.
+// Point this at your deployed Via instance (github.com/eitchtee/Via, default port 8080).
+const VIA_SERVER = 'http://localhost:8080';
 
 let cfg;
 let pending = null; // onboarding: { server, info }
