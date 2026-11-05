@@ -88,8 +88,11 @@ async function detectLan(auto = false) {
     const has = await b.permissions.contains({ origins: LAN_PERMISSIONS });
     if (!has) {
       const granted = await b.permissions.request({ origins: LAN_PERMISSIONS });
-      if (!granted && !auto) return status('server-status', 'Permission for local network addresses was denied.', 'error');
-      if (!granted) return; // silent in auto mode; field stays editable
+      if (!granted) {
+        if (!auto) return status('server-status', 'Permission for local network addresses was denied.', 'error');
+        $('server').placeholder = 'http://192.168.1.10:8080'; // silent in auto mode; field stays editable
+        return;
+      }
     }
     const found = await probeLan();
     if (found) {
