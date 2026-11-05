@@ -18,7 +18,7 @@ init();
 async function init() {
   cfg = await getConfig();
   $('step-server').onsubmit = onServer;
-  $('detect').onclick = detectLan;
+
   $('step-account').onsubmit = onAccount;
   $('account-back').onclick = () => show('step-server');
   $('done-settings').onclick = openSettings;
@@ -67,34 +67,39 @@ function startOnboarding() {
       const via = $('type-via').checked;
       const lan = $('type-lan').checked;
       $('server').readOnly = via;
-      $('server').placeholder = lan ? 'http://192.168.1.10:8080' : 'https://via.example.com';
+      $('server').placeholder = lan ? 'Detecting on your network…' : 'https://via.example.com';
       $('server').value = via ? VIA_SERVER : (cfg.server && cfg.server !== VIA_SERVER ? cfg.server : '');
+      if (lan) detectLan(true); // auto-fill the LAN address when LAN is chosen
     };
   }
   status('server-status', cfg.server ? 'This browser was signed out. Sign in again to reconnect.' : '');
   show('step-server');
+  if ($('type-lan').checked) detectLan(true); // auto-detect on load if LAN was saved
 }
 
 // Probe common LAN locations for a Via server and fill in the first one that answers.
-async function detectLan() {
-  const btn = $('detect');
-  btn.disabled = true;
-  status('server-status', 'Looking for a server on your network…');
+// With `auto`, runs silently when the LAN option is selected (permission already
+// granted or not — on failure the field just stays editable).
+async function detectLan(auto = false) {
+  if (!auto) status('server-status', 'Looking for a server on your network…');
   try {
-    const granted = await b.permissions.request({ origins: LAN_PERMISSIONS });
-    if (!granted) return status('server-status', 'Permission for local network addresses was denied.', 'error');
+    if (!auto) {
+      const granted = await b.permissions.request({ origins: LAN_PERMISSIONS });
+      if (!granted) return status('server-status', 'Permission for local network addresses was denied.', 'error');
+    }
     const found = await probeLan();
     if (found) {
-      $('type-lan').checked = true;
-      $('type-lan').onchange?.();
       $('server').value = found;
-      return status('server-status', `Found a Via server at ${found}`, 'ok');
+      $('server').placeholder = 'http://192.168.1.10:8080';
+      status('server-status', auto ? `Found ${found}` : `Found a Via server at ${found}`, 'ok');
+    } else if (!auto) {
+      status('server-status', 'No Via server found on your network. Enter its address manually.', 'error');
+    } else {
+      $('server').placeholder = 'http://192.168.1.10:8080';
+      status('server-status', '');
     }
-    status('server-status', 'No Via server found on your network. Enter its address manually.', 'error');
   } catch (err) {
-    status('server-status', errorText(err), 'error');
-  } finally {
-    btn.disabled = false;
+    if (!auto) status('server-status', errorText(err), 'error');
   }
 }
 
