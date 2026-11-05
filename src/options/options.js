@@ -117,9 +117,14 @@ async function onServer(e) {
     const granted = await b.permissions.request({ origins: [originPattern(server)] });
     if (!granted) return status('server-status', 'SendIt needs permission to talk to your server to work.', 'error');
     status('server-status', 'Checking…');
-    const info = await call(server, '/v1/info').catch((err) => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000); // fail fast instead of hanging
+    const info = await call(server, '/v1/info', { signal: ctrl.signal }).catch((err) => {
+      clearTimeout(timer);
+      if (err?.name === 'AbortError') throw new Error('That address did not answer within 8 seconds. Check the address and your connection.');
       throw err instanceof ApiError && err.status ? new Error('That address answered, but it isn’t a Via server.') : err;
     });
+    clearTimeout(timer);
     if (info?.name !== 'via' || info.api_version !== 1) {
       throw new Error(info?.name === 'via'
         ? `This server speaks API version ${info.api_version}; this extension needs version 1.`

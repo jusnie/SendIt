@@ -347,7 +347,10 @@ function setStatus(text, kind = '') {
 /** Keep the server's size limits fresh for validation. */
 async function refreshLimits() {
   try {
-    const info = await call(cfg.server, '/v1/info');
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const info = await call(cfg.server, '/v1/info', { signal: ctrl.signal });
+    clearTimeout(timer);
     cfg = await updateConfig({ limits: info.limits, features: info.features });
     updateTextCount();
     if (files.length) renderFiles();
