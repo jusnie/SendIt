@@ -8,7 +8,7 @@ export const LAN_PERMISSIONS = [
   'http://sendit.local/*',
 ];
 
-const HOSTS = ['via.local', 'sendit.local', '192.168.1.1', '192.168.0.1', '10.0.0.1', '172.16.0.1'];
+const HOSTS = ['via.local', 'sendit.local', '127.0.0.1', '192.168.1.1', '192.168.0.1', '10.0.0.1', '172.16.0.1'];
 const PORTS = ['', ':8080', ':3000', ':8787', ':80'];
 
 /**
