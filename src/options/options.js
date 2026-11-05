@@ -106,10 +106,15 @@ async function detectLan(auto = false) {
 async function onServer(e) {
   e.preventDefault();
   let server;
+  if (!$('server').value.trim()) {
+    return status('server-status', $('type-lan').checked
+      ? 'Still looking on your network… or enter the address manually.'
+      : 'Enter a server address first.', 'error');
+  }
   try {
     server = normalizeServer($('server').value);
   } catch {
-    return status('server-status', 'That doesn’t look like a web address.', 'error');
+    return status('server-status', 'Enter a full address, like https://via.example.com or http://192.168.1.10:8080.', 'error');
   }
   busy($('server-go'), true);
   try {
