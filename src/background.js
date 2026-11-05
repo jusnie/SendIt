@@ -303,7 +303,7 @@ async function handle(cfg, item) {
   // PIN protection: items from other devices/contacts stay locked until unlocked in the popup.
   if (cfg.settings.pin && item.sender != null) {
     await putHistory({ ...entry, status: 'locked' });
-    notify(`via:${item.id}`, '🔒 Locked item received', 'Open SendIt and enter your PIN to unlock it.', entry.from);
+    notify(`via:${item.id}`, 'Locked item received', 'Open SendIt and enter your PIN to unlock it.', entry.from);
     return true;
   }
 

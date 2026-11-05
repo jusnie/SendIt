@@ -123,3 +123,22 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); box-sh
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+/* ---- minimalist modern pass ---- */
+:root {
+  --radius: 12px;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.05), 0 8px 28px rgb(0 0 0 / 0.06);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 28px rgb(0 0 0 / 0.35); }
+}
+body { letter-spacing: 0.01em; }
+.card.panel { border: 1px solid var(--border); }
+.btn { border-radius: var(--radius); font-weight: 600; letter-spacing: 0.01em; }
+.btn.primary { box-shadow: 0 1px 2px rgb(0 0 0 / 0.12); }
+input, textarea { border-radius: var(--radius); border: 1px solid var(--border); }
+input:focus, textarea:focus { border-color: var(--accent); outline: 3px solid var(--focus); }
+.bar, .brand { letter-spacing: 0.01em; }
+h1, h2 { letter-spacing: -0.01em; font-weight: 650; }
+.pin-banner { background: var(--danger-soft); color: var(--danger); border: 1px solid var(--border); }
